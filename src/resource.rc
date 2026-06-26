@@ -1,0 +1,2 @@
+// Resource file to compile and link application icon
+1 ICON "icon.ico"
