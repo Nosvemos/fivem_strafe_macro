@@ -46,14 +46,52 @@ set(HEADERS
     src/process_monitor.h
 )
 
+# ── Fetch Dear ImGui ──────────────────────────────────────────────────
+include(FetchContent)
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        v1.91.4
+)
+
+FetchContent_GetProperties(imgui)
+if(NOT imgui_POPULATED)
+    FetchContent_Populate(imgui)
+endif()
+
+set(IMGUI_SOURCES
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp
+)
+
+add_library(imgui STATIC ${IMGUI_SOURCES})
+target_include_directories(imgui PUBLIC
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+)
+# Ensure Unicode configuration is consistent
+target_compile_definitions(imgui PRIVATE UNICODE _UNICODE)
+
 # ── Executable (WIN32 = no console window) ───────────────────────────
 add_executable(${PROJECT_NAME} WIN32 ${SOURCES} ${HEADERS})
 
-# ── Link system libraries ────────────────────────────────────────────
+# ── Link libraries ───────────────────────────────────────────────────
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    comctl32    # Common controls (TrackBar, etc.)
+    imgui
     shell32     # Shell_NotifyIcon (tray icon)
     dwmapi      # DwmSetWindowAttribute (dark title bar)
+    d3d11       # DirectX 11
+    d3dcompiler # D3D compiler
+    dxgi        # DXGI
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
 )
 
 # ── Unicode build ────────────────────────────────────────────────────

@@ -2,34 +2,18 @@
 #include "macro_engine.h"
 #include "hotkey_manager.h"
 #include "gui.h"
-#include "process_monitor.h"
 
 #include <windows.h>
-#include <commctrl.h>
-
-#ifdef _MSC_VER
-#pragma comment(linker, "/manifestdependency:\"type='win32' \
-name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
-processorArchitecture='*' publicKeyToken='6595b64144ccf1df' \
-language='*'\"")
-#endif
-
-
-
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE,
                    LPSTR, int)
 {
-    INITCOMMONCONTROLSEX icc = {};
-    icc.dwSize = sizeof(icc);
-    icc.dwICC  = ICC_BAR_CLASSES | ICC_STANDARD_CLASSES;
-    InitCommonControlsEx(&icc);
-
+    // Set high-DPI awareness
     HMODULE shcore = LoadLibraryW(L"shcore.dll");
     if (shcore) {
         auto fn = reinterpret_cast<HRESULT(WINAPI*)(int)>(
             GetProcAddress(shcore, "SetProcessDpiAwareness"));
-        if (fn) fn(2);
+        if (fn) fn(2); // PROCESS_PER_MONITOR_DPI_AWARE
         FreeLibrary(shcore);
     }
 
@@ -38,29 +22,33 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE,
     HotkeyManager hotkeyMgr(config);
     GUI           gui(config, engine, hotkeyMgr);
 
-    if (!gui.create(hInstance)) {
-        MessageBoxW(nullptr, L"Failed to create application window.",
+    if (!gui.init(hInstance)) {
+        MessageBoxW(nullptr, L"Failed to initialize modern interface.",
                     L"Error", MB_OK | MB_ICONERROR);
         return 1;
     }
 
     HWND guiHwnd = gui.getHwnd();
 
+    // Start hotkey manager
     hotkeyMgr.start([&engine, guiHwnd](bool activate) {
         if (activate)
             engine.start();
         else
             engine.stop();
-        PostMessageW(guiHwnd, WM_MACRO_STATE,
-                     activate ? 1 : 0, 0);
+        PostMessageW(guiHwnd, WM_MACRO_STATE, activate ? 1 : 0, 0);
     });
 
+    // Start timer for FiveM process monitoring (every 2 seconds)
     SetTimer(guiHwnd, 1, 2000, nullptr);
 
-    int result = gui.messageLoop();
+    // Enter message / render loop (blocks until window close)
+    gui.run();
 
+    // Cleanup
     hotkeyMgr.stop();
     engine.stop();
+    gui.shutdown();
 
-    return result;
+    return 0;
 }
